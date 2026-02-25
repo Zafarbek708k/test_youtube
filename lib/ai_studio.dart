@@ -16,71 +16,39 @@ class CinemaScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000), // True OLED Black
+      backgroundColor: const Color(0xFF000000),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            // ── Premium App Bar ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFE8C97A), Color(0xFFB8943A)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: const [BoxShadow(color: Color(0x44E8C97A), blurRadius: 12, offset: Offset(0, 4))],
-                        ),
-                        child: const Icon(Icons.movie_creation_rounded, color: Color(0xFF080810), size: 20),
-                      ),
-                      const SizedBox(width: 14),
-                      RichText(
-                        text: const TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'ABSOLUTE\n',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.5,
-                                height: 1.1,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'LOGISTICS',
-                              style: TextStyle(
-                                color: Color(0xFFE8C97A),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: 4.5,
-                                height: 1.1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      image: DecorationImage(image: AssetImage("assets/app_icon.png")),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: const [BoxShadow(color: Color(0x44E8C97A), blurRadius: 12, offset: Offset(0, 4))],
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.cast_rounded, color: Colors.white, size: 24),
-                    onPressed: () {},
+                  const SizedBox(width: 14),
+                  Text(
+                    "Sarbon",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.5,
+                      height: 1.1,
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // ── The Video Player ──
             Container(
               decoration: const BoxDecoration(
                 boxShadow: [BoxShadow(color: Color(0x33E8C97A), blurRadius: 40, offset: Offset(0, 5))],
@@ -88,7 +56,6 @@ class CinemaScaffold extends StatelessWidget {
               child: player,
             ),
 
-            // ── Scrollable Details & Up Next ──
             Expanded(
               child: SingleChildScrollView(physics: const BouncingScrollPhysics(), child: _VideoInfoPanel()),
             ),
