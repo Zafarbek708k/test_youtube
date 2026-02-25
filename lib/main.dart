@@ -8,17 +8,18 @@ import 'package:test_youtube/cinema_gemini.dart';
 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.light),
-  );
-  // SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  // which is horizontal
-  // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+// void main() {
+//   WidgetsFlutterBinding.ensureInitialized();
+//   SystemChrome.setSystemUIOverlayStyle(
+//     const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.light),
+//   );
+//   // SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+//   // which is horizontal
+//   // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+//
+//   runApp(const CinemaApp());
+// }
 
-  runApp(const CinemaApp());
-}
 
 // class CinemaApp extends StatelessWidget {
 //   const CinemaApp({super.key});
@@ -116,16 +117,17 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: BlocBuilder<YouTubePlayerBloc, YouTubePlayerState>(
-                builder: (context, state) => Text(
-                  state.metaData.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.3,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                builder: (context, state) =>
+                    Text(
+                      state.metaData.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
               ),
             ),
             IconButton(
@@ -269,7 +271,8 @@ class _VideoInfoPanel extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '${state.currentIndex + 1} of ${state.ids.length}  ·  ${state.playbackQuality ?? 'HD'}  ·  ${state.playbackRate}x',
+                          '${state.currentIndex + 1} of ${state.ids.length}  ·  ${state.playbackQuality ??
+                              'HD'}  ·  ${state.playbackRate}x',
                           style: const TextStyle(color: Colors.white38, fontSize: 11),
                         ),
                       ],
@@ -371,10 +374,10 @@ class _ControlsBar extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: state.isPlayerReady
                   ? const LinearGradient(
-                      colors: [Color(0xFFE8C97A), Color(0xFFB8943A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
+                colors: [Color(0xFFE8C97A), Color(0xFFB8943A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
                   : const LinearGradient(colors: [Color(0x33FFFFFF), Color(0x22FFFFFF)]),
               borderRadius: BorderRadius.circular(34),
               boxShadow: state.isPlayerReady
@@ -499,9 +502,9 @@ class _UpNextList extends StatelessWidget {
                     child: isActive
                         ? const Icon(Icons.graphic_eq, color: Color(0xFF080810), size: 18)
                         : Text(
-                            '${i + 1}',
-                            style: const TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
+                      '${i + 1}',
+                      style: const TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

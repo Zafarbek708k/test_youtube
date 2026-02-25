@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:test_youtube/ai_studio.dart';
 import 'package:test_youtube/bloc/you_tube_player_bloc.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'dart:ui';
@@ -97,43 +98,44 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
           onReady: () => _bloc.add(PlayerInitialized()),
           onEnded: (data) => _bloc.add(VideoEnded(data.videoId)),
         ),
-        builder: (context, player) => Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(-0.5, -0.8),
-                radius: 1.5,
-                colors: [Color(0xFF1A1A2E), Color(0xFF0D0D12)],
-              ),
-            ),
-            child: CustomScrollView(
-              slivers: [
-                _buildAppBar(),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6C5DD3).withValues(alpha: 0.2),
-                              blurRadius: 40,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: player,
-                      ),
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(child: _VideoModernDetails()),
-              ],
-            ),
-          ),
-        ),
+        builder: (context, player) => CinemaScaffold(player: player),
+        // builder: (context, player) => Scaffold(
+        //   body: Container(
+        //     decoration: const BoxDecoration(
+        //       gradient: RadialGradient(
+        //         center: Alignment(-0.5, -0.8),
+        //         radius: 1.5,
+        //         colors: [Color(0xFF1A1A2E), Color(0xFF0D0D12)],
+        //       ),
+        //     ),
+        //     child: CustomScrollView(
+        //       slivers: [
+        //         _buildAppBar(),
+        //         SliverToBoxAdapter(
+        //           child: Padding(
+        //             padding: const EdgeInsets.symmetric(horizontal: 16),
+        //             child: ClipRRect(
+        //               borderRadius: BorderRadius.circular(24),
+        //               child: Container(
+        //                 decoration: BoxDecoration(
+        //                   boxShadow: [
+        //                     BoxShadow(
+        //                       color: const Color(0xFF6C5DD3).withValues(alpha: 0.2),
+        //                       blurRadius: 40,
+        //                       offset: const Offset(0, 10),
+        //                     ),
+        //                   ],
+        //                 ),
+        //                 child: player,
+        //               ),
+        //             ),
+        //           ),
+        //         ),
+        //         SliverToBoxAdapter(child: _VideoModernDetails()),
+        //       ],
+        //     ),
+        //   ),
+        // ),
       ),
     );
   }
@@ -148,11 +150,11 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
           children: [
             TextSpan(
-              text: 'Neo',
+              text: 'Absolute ',
               style: TextStyle(color: Colors.white),
             ),
             TextSpan(
-              text: 'Stream',
+              text: 'Logistic',
               style: TextStyle(color: Color(0xFF6C5DD3)),
             ),
           ],
