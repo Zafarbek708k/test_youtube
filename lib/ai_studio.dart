@@ -25,15 +25,7 @@ class CinemaScaffold extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      image: DecorationImage(image: AssetImage("assets/app_icon.png")),
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: const [BoxShadow(color: Color(0x44E8C97A), blurRadius: 12, offset: Offset(0, 4))],
-                    ),
-                  ),
+                  GestureDetector(onTap: () => Navigator.of(context).pop(), child: Icon(Icons.arrow_back_ios)),
                   const SizedBox(width: 14),
                   Text(
                     "Sarbon",
