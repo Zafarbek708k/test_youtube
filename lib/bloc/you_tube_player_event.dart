@@ -42,6 +42,16 @@ class NextVideo extends YouTubePlayerEvent {
   List<Object?> get props => [];
 }
 
+/// Play a specific item from the playlist (e.g. tapping "Up next").
+class VideoSelected extends YouTubePlayerEvent {
+  final int index;
+
+  const VideoSelected(this.index);
+
+  @override
+  List<Object?> get props => [index];
+}
+
 class PreviousVideo extends YouTubePlayerEvent {
   @override
   List<Object?> get props => [];

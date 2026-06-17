@@ -9,7 +9,7 @@ part 'you_tube_player_state.dart';
 class YouTubePlayerBloc extends Bloc<YouTubePlayerEvent, YouTubePlayerState> {
   final YoutubePlayerController controller;
 
-  YouTubePlayerBloc(this.controller) : super(YouTubePlayerState(ids: ['-l8-B2MtF84', 'AnVO_pFyz7o', 'EZ7dZklX81U'])) {
+  YouTubePlayerBloc(this.controller, {required List<String> ids}) : super(YouTubePlayerState(ids: ids)) {
     on<YouTubePlayerEvent>((event, emit) {});
     on<PlayerInitialized>(_onPlayerInitialized);
     on<PlayPauseToggled>(_onPlayPauseToggled);
@@ -18,6 +18,7 @@ class YouTubePlayerBloc extends Bloc<YouTubePlayerEvent, YouTubePlayerState> {
     on<VideoEnded>(_onVideoEnded);
     on<NextVideo>(_onNextVideo);
     on<PreviousVideo>(_onPreviousVideo);
+    on<VideoSelected>(_onVideoSelected);
     on<MetadataUpdated>(_onMetadataUpdated);
   }
 
@@ -64,6 +65,12 @@ class YouTubePlayerBloc extends Bloc<YouTubePlayerEvent, YouTubePlayerState> {
     final prevIndex = (state.currentIndex - 1 + state.ids.length) % state.ids.length;
     controller.load(state.ids[prevIndex]);
     emit(state.copyWith(currentIndex: prevIndex, isPlaying: true));
+  }
+
+  void _onVideoSelected(VideoSelected event, Emitter<YouTubePlayerState> emit) {
+    if (event.index < 0 || event.index >= state.ids.length) return;
+    controller.load(state.ids[event.index]);
+    emit(state.copyWith(currentIndex: event.index, isPlaying: true));
   }
 
   void _onMetadataUpdated(MetadataUpdated event, Emitter<YouTubePlayerState> emit) {

@@ -1,61 +1,90 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:test_youtube/ai_studio.dart';
-import 'package:test_youtube/bloc/you_tube_player_bloc.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'dart:ui';
 
-class CinemaApp extends StatelessWidget {
-  const CinemaApp({super.key});
+import 'bloc/you_tube_player_bloc.dart';
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Neon Cinema',
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0D0D12),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF6C5DD3), // Modern Purple
-          secondary: Color(0xFF00C2FF), // Cyber Blue
-          surface: Color(0xFF1A1A24),
-        ),
-      ),
-      home: const YoutubePlayerScreen(),
-    );
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sarbon palette — primary green, action blue, light surfaces, black/gray text.
+// ─────────────────────────────────────────────────────────────────────────────
+const _green = Color(0xFF26BD49); // Sarbon primary
+const _blue = Color(0xFF007AFF); // Sarbon action/button
+const _scaffold = Color(0xFFF3F6FB);
+const _card = Colors.white;
+const _textPrimary = Color(0xFF1A1A1E);
+const _textSecondary = Color(0xFF8E95A5);
+const _divider = Color(0xFFE9EDF2);
+
+/// Fallback playlist used when the screen is opened without [sources]
+/// (e.g. local/standalone testing).
+const _fallbackIds = ['-l8-B2MtF84', 'AnVO_pFyz7o', 'EZ7dZklX81U'];
+
+/// Resolves a source string (a full YouTube URL or a bare video id) to a video
+/// id. Returns null for empty/invalid input.
+String? _resolveVideoId(String src) {
+  final s = src.trim();
+  if (s.isEmpty) return null;
+  if (s.startsWith('http') || s.contains('youtu')) {
+    return YoutubePlayer.convertUrlToId(s);
   }
+  return s; // already an id
 }
 
+/// Video-instruction screen for the Sarbon app.
+///
+/// Pass [initialSource] (the video to open first) and [sources] (the full
+/// playlist). Each may be a YouTube URL or a bare video id:
+///
+/// ```dart
+/// YoutubePlayerScreen(
+///   initialSource: 'https://youtu.be/-l8-B2MtF84',
+///   sources: ['-l8-B2MtF84', 'AnVO_pFyz7o'],
+/// )
+/// ```
 class YoutubePlayerScreen extends StatefulWidget {
-  const YoutubePlayerScreen({super.key});
+  const YoutubePlayerScreen({
+    super.key,
+    this.initialSource = '',
+    this.sources = const [],
+  });
+
+  final String initialSource;
+  final List<String> sources;
 
   @override
   State<YoutubePlayerScreen> createState() => _YoutubePlayerScreenState();
 }
 
 class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
-  late YoutubePlayerController _controller;
-  late YouTubePlayerBloc _bloc;
+  late final YoutubePlayerController _controller;
+  late final YouTubePlayerBloc _bloc;
 
-  final List<String> _ids = const ['-l8-B2MtF84', 'AnVO_pFyz7o', 'EZ7dZklX81U'];
+  /// Builds the ordered playlist: [initialSource] first, then the rest of
+  /// [sources] (de-duplicated), falling back to a sample list if both are empty.
+  List<String> _buildIds() {
+    final resolved = widget.sources.map(_resolveVideoId).whereType<String>().toList();
+    final initial = _resolveVideoId(widget.initialSource);
+    final ids = <String>[
+      if (initial != null) initial,
+      ...resolved.where((id) => id != initial),
+    ];
+    return ids.isEmpty ? List<String>.from(_fallbackIds) : ids;
+  }
 
   @override
   void initState() {
     super.initState();
+    final ids = _buildIds();
     _controller = YoutubePlayerController(
-      initialVideoId: _ids.first,
+      initialVideoId: ids.first,
       flags: const YoutubePlayerFlags(
-        mute: false,
         autoPlay: true,
-        disableDragSeek: false,
-        loop: false,
-        isLive: false,
-        forceHD: false,
+        mute: false,
         enableCaption: true,
       ),
     );
-    _bloc = YouTubePlayerBloc(_controller);
+    _bloc = YouTubePlayerBloc(_controller, ids: ids);
     _controller.addListener(_listener);
   }
 
@@ -70,6 +99,13 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
         ),
       );
     }
+  }
+
+  @override
+  void deactivate() {
+    // Pause when navigating away so audio doesn't keep playing.
+    _controller.pause();
+    super.deactivate();
   }
 
   @override
@@ -88,147 +124,125 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
         onExitFullScreen: () => SystemChrome.setPreferredOrientations(DeviceOrientation.values),
         player: YoutubePlayer(
           controller: _controller,
-          progressIndicatorColor: const Color(0xFF6C5DD3),
+          showVideoProgressIndicator: true,
+          progressIndicatorColor: _green,
           progressColors: const ProgressBarColors(
-            playedColor: Color(0xFF6C5DD3),
-            handleColor: Color(0xFF00C2FF),
-            bufferedColor: Colors.white24,
-            backgroundColor: Colors.white10,
+            playedColor: _green,
+            handleColor: _blue,
+            bufferedColor: Color(0x5526BD49),
+            backgroundColor: Color(0x22000000),
           ),
           onReady: () => _bloc.add(PlayerInitialized()),
           onEnded: (data) => _bloc.add(VideoEnded(data.videoId)),
         ),
-        builder: (context, player) => CinemaScaffold(player: player),
-        // builder: (context, player) => Scaffold(
-        //   body: Container(
-        //     decoration: const BoxDecoration(
-        //       gradient: RadialGradient(
-        //         center: Alignment(-0.5, -0.8),
-        //         radius: 1.5,
-        //         colors: [Color(0xFF1A1A2E), Color(0xFF0D0D12)],
-        //       ),
-        //     ),
-        //     child: CustomScrollView(
-        //       slivers: [
-        //         _buildAppBar(),
-        //         SliverToBoxAdapter(
-        //           child: Padding(
-        //             padding: const EdgeInsets.symmetric(horizontal: 16),
-        //             child: ClipRRect(
-        //               borderRadius: BorderRadius.circular(24),
-        //               child: Container(
-        //                 decoration: BoxDecoration(
-        //                   boxShadow: [
-        //                     BoxShadow(
-        //                       color: const Color(0xFF6C5DD3).withValues(alpha: 0.2),
-        //                       blurRadius: 40,
-        //                       offset: const Offset(0, 10),
-        //                     ),
-        //                   ],
-        //                 ),
-        //                 child: player,
-        //               ),
-        //             ),
-        //           ),
-        //         ),
-        //         SliverToBoxAdapter(child: _VideoModernDetails()),
-        //       ],
-        //     ),
-        //   ),
-        // ),
+        builder: (context, player) => _VideoScaffold(player: player),
       ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return SliverAppBar(
-      floating: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      title: RichText(
-        text: const TextSpan(
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-          children: [
-            TextSpan(
-              text: 'Absolute ',
-              style: TextStyle(color: Colors.white),
-            ),
-            TextSpan(
-              text: 'Logistic',
-              style: TextStyle(color: Color(0xFF6C5DD3)),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        CircleAvatar(
-          backgroundColor: Colors.white.withValues(alpha: 0.05),
-          child: const Icon(Icons.search, color: Colors.white70, size: 20),
-        ),
-        const SizedBox(width: 12),
-        CircleAvatar(
-          backgroundColor: Colors.white.withValues(alpha: 0.05),
-          child: const Icon(Icons.person_outline, color: Colors.white70, size: 20),
-        ),
-        const SizedBox(width: 16),
-      ],
     );
   }
 }
 
-class _VideoModernDetails extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+//  Scaffold — green Sarbon-style app bar + light body.
+// ─────────────────────────────────────────────────────────────────────────────
+class _VideoScaffold extends StatelessWidget {
+  const _VideoScaffold({required this.player});
+
+  final Widget player;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _scaffold,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+          child: AppBar(
+            backgroundColor: _green,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            centerTitle: false,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+            title: const Text(
+              'Video qo‘llanma',
+              style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ),
+      body: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
+          Container(
+            color: Colors.black,
+            child: player,
+          ),
+          const _InfoPanel(),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Info panel — title, meta, controls, volume, up-next.
+// ─────────────────────────────────────────────────────────────────────────────
+class _InfoPanel extends StatelessWidget {
+  const _InfoPanel();
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<YouTubePlayerBloc, YouTubePlayerState>(
       builder: (context, state) {
         final bloc = context.read<YouTubePlayerBloc>();
         return Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Title.
               Text(
-                state.metaData.title.isEmpty ? "Initializing..." : state.metaData.title,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2),
+                state.metaData.title.isEmpty ? 'Yuklanmoqda…' : state.metaData.title,
+                style: const TextStyle(
+                  color: _textPrimary,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              // Meta row.
               Row(
                 children: [
-                  _InfoBadge(icon: Icons.hd_outlined, label: state.playbackQuality ?? 'Auto'),
+                  _StatusChip(playing: state.isPlaying),
                   const SizedBox(width: 8),
-                  _InfoBadge(icon: Icons.speed, label: '${state.playbackRate}x'),
+                  Text(
+                    '${state.currentIndex + 1}/${state.ids.length}  ·  ${state.playbackQuality ?? 'HD'}',
+                    style: const TextStyle(color: _textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                 ],
               ),
-              const SizedBox(height: 30),
-
-              // New Glassmorphic Control Panel
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _TransparentIconButton(
-                      icon: Icons.skip_previous_rounded,
-                      onPressed: () => bloc.add(PreviousVideo()),
-                    ),
-                    _PlayButton(isPlaying: state.isPlaying, onPressed: () => bloc.add(PlayPauseToggled())),
-                    _TransparentIconButton(icon: Icons.skip_next_rounded, onPressed: () => bloc.add(NextVideo())),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              // Controls card.
+              _ControlsCard(state: state, bloc: bloc),
+              const SizedBox(height: 20),
+              // Volume.
+              _VolumeBar(state: state, bloc: bloc),
+              const SizedBox(height: 24),
+              const Divider(color: _divider, height: 1),
+              const SizedBox(height: 20),
               const Text(
-                "UP NEXT",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white38, letterSpacing: 2),
+                'Keyingi videolar',
+                style: TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 16),
-              _ModernPlaylist(state: state, bloc: bloc),
+              const SizedBox(height: 12),
+              _UpNextList(state: state, bloc: bloc),
             ],
           ),
         );
@@ -237,28 +251,26 @@ class _VideoModernDetails extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// UI COMPONENTS
-// ─────────────────────────────────────────────
-
-class _InfoBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _InfoBadge({required this.icon, required this.label});
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.playing});
+  final bool playing;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: _green.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF00C2FF)),
-          const SizedBox(width: 6),
+          Icon(playing ? Icons.play_arrow_rounded : Icons.pause_rounded, color: _green, size: 14),
+          const SizedBox(width: 4),
           Text(
-            label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+            playing ? 'Ijro etilmoqda' : 'To‘xtatilgan',
+            style: const TextStyle(color: _green, fontSize: 11, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -266,113 +278,209 @@ class _InfoBadge extends StatelessWidget {
   }
 }
 
-class _PlayButton extends StatelessWidget {
-  final bool isPlaying;
-  final VoidCallback onPressed;
+// ─────────────────────────────────────────────────────────────────────────────
+//  Controls — green icon buttons + a blue play button.
+// ─────────────────────────────────────────────────────────────────────────────
+class _ControlsCard extends StatelessWidget {
+  const _ControlsCard({required this.state, required this.bloc});
+  final YouTubePlayerState state;
+  final YouTubePlayerBloc bloc;
 
-  const _PlayButton({required this.isPlaying, required this.onPressed});
+  @override
+  Widget build(BuildContext context) {
+    final ready = state.isPlayerReady;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _divider),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _IconBtn(icon: Icons.skip_previous_rounded, enabled: ready, onTap: () => bloc.add(PreviousVideo())),
+          _IconBtn(
+            icon: state.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+            enabled: ready,
+            onTap: () => bloc.add(MuteToggled()),
+          ),
+          // Play / pause — blue action button.
+          GestureDetector(
+            onTap: ready ? () => bloc.add(PlayPauseToggled()) : null,
+            child: Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: ready ? _blue : _divider,
+                shape: BoxShape.circle,
+                boxShadow: ready
+                    ? [BoxShadow(color: _blue.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))]
+                    : null,
+              ),
+              child: Icon(
+                state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+          ),
+          _IconBtn(
+            icon: Icons.fullscreen_rounded,
+            enabled: ready,
+            onTap: () => bloc.controller.toggleFullScreenMode(),
+          ),
+          _IconBtn(icon: Icons.skip_next_rounded, enabled: ready, onTap: () => bloc.add(NextVideo())),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconBtn extends StatelessWidget {
+  const _IconBtn({required this.icon, required this.enabled, required this.onTap});
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: enabled ? onTap : null,
       child: Container(
-        height: 70,
-        width: 70,
-        decoration: const BoxDecoration(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: _green.withValues(alpha: enabled ? 0.10 : 0.04),
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [Color(0xFF6C5DD3), Color(0xFF8E81EB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [BoxShadow(color: Color(0x446C5DD3), blurRadius: 20, offset: Offset(0, 8))],
         ),
-        child: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 35),
+        child: Icon(icon, color: enabled ? _green : _textSecondary.withValues(alpha: 0.4), size: 24),
       ),
     );
   }
 }
 
-class _TransparentIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  const _TransparentIconButton({required this.icon, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(icon, color: Colors.white, size: 28),
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        backgroundColor: Colors.white.withValues(alpha: 0.05),
-        padding: const EdgeInsets.all(12),
-      ),
-    );
-  }
-}
-
-class _ModernPlaylist extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+//  Volume — green track.
+// ─────────────────────────────────────────────────────────────────────────────
+class _VolumeBar extends StatelessWidget {
+  const _VolumeBar({required this.state, required this.bloc});
   final YouTubePlayerState state;
   final YouTubePlayerBloc bloc;
 
-  const _ModernPlaylist({required this.state, required this.bloc});
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.volume_mute_rounded, color: _textSecondary, size: 20),
+        Expanded(
+          child: SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: _green,
+              inactiveTrackColor: _divider,
+              thumbColor: _green,
+              overlayColor: _green.withValues(alpha: 0.15),
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            ),
+            child: Slider(
+              value: state.volume,
+              min: 0,
+              max: 100,
+              onChanged: state.isPlayerReady ? (v) => bloc.add(VolumeChanged(v)) : null,
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 36,
+          child: Text(
+            '${state.volume.round()}',
+            textAlign: TextAlign.end,
+            style: const TextStyle(color: _textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Up next — light cards with a green active accent + real thumbnails.
+// ─────────────────────────────────────────────────────────────────────────────
+class _UpNextList extends StatelessWidget {
+  const _UpNextList({required this.state, required this.bloc});
+  final YouTubePlayerState state;
+  final YouTubePlayerBloc bloc;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: state.ids.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        bool isActive = state.currentIndex == index;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF6C5DD3).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isActive ? const Color(0xFF6C5DD3).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05),
+    return Column(
+      children: List.generate(state.ids.length, (i) {
+        final isActive = i == state.currentIndex;
+        final id = state.ids[i];
+        return GestureDetector(
+          onTap: isActive ? null : () => bloc.add(VideoSelected(i)),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isActive ? _green.withValues(alpha: 0.08) : _card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: isActive ? _green : _divider, width: isActive ? 1.4 : 1),
             ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 50,
-                height: 50,
-                color: isActive ? const Color(0xFF6C5DD3) : Colors.white10,
-                child: Center(
-                  child: Text(
-                    "${index + 1}",
-                    style: TextStyle(fontWeight: FontWeight.bold, color: isActive ? Colors.white : Colors.white30),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    'https://img.youtube.com/vi/$id/hqdefault.jpg',
+                    width: 96,
+                    height: 60,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 96,
+                      height: 60,
+                      color: _divider,
+                      child: const Icon(Icons.movie_outlined, color: _textSecondary),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${i + 1}-video',
+                        style: TextStyle(
+                          color: isActive ? _green : _textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isActive ? 'Hozir ijro etilmoqda' : 'Ko‘rish uchun bosing',
+                        style: const TextStyle(color: _textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  isActive ? Icons.graphic_eq_rounded : Icons.play_circle_outline_rounded,
+                  color: isActive ? _green : _textSecondary,
+                  size: 24,
+                ),
+              ],
             ),
-            title: Text(
-              "Video ID: ${state.ids[index]}",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                color: isActive ? Colors.white : Colors.white70,
-              ),
-            ),
-            subtitle: Text(
-              isActive ? "Now Playing" : "Tap to play",
-              style: TextStyle(fontSize: 12, color: isActive ? const Color(0xFF00C2FF) : Colors.white24),
-            ),
-            trailing: Icon(
-              isActive ? Icons.bar_chart_rounded : Icons.play_circle_outline,
-              color: isActive ? const Color(0xFF00C2FF) : Colors.white24,
-            ),
-            onTap: () => bloc.controller.load(state.ids[index]),
           ),
         );
-      },
+      }),
     );
   }
+}
+
+/// Exposes the underlying controller for the fullscreen toggle.
+extension on YouTubePlayerBloc {
+  YoutubePlayerController get controller => (this as dynamic).controller;
 }
