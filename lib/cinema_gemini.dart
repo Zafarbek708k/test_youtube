@@ -16,10 +16,6 @@ const _textPrimary = Color(0xFF1A1A1E);
 const _textSecondary = Color(0xFF8E95A5);
 const _divider = Color(0xFFE9EDF2);
 
-/// Fallback playlist used when the screen is opened without [sources]
-/// (e.g. local/standalone testing).
-const _fallbackIds = ['-l8-B2MtF84', 'AnVO_pFyz7o', 'EZ7dZklX81U'];
-
 /// Resolves a source string (a full YouTube URL or a bare video id) to a video
 /// id. Returns null for empty/invalid input.
 String? _resolveVideoId(String src) {
@@ -43,11 +39,7 @@ String? _resolveVideoId(String src) {
 /// )
 /// ```
 class YoutubePlayerScreen extends StatefulWidget {
-  const YoutubePlayerScreen({
-    super.key,
-    this.initialSource = '',
-    this.sources = const [],
-  });
+  const YoutubePlayerScreen({super.key, this.initialSource = '', this.sources = const []});
 
   final String initialSource;
   final List<String> sources;
@@ -57,45 +49,44 @@ class YoutubePlayerScreen extends StatefulWidget {
 }
 
 class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
-  late final YoutubePlayerController _controller;
-  late final YouTubePlayerBloc _bloc;
+  // Null when no videos were provided — the screen then shows an empty state
+  // and never creates a player/bloc.
+  YoutubePlayerController? _controller;
+  YouTubePlayerBloc? _bloc;
 
-  /// Builds the ordered playlist: [initialSource] first, then the rest of
-  /// [sources] (de-duplicated), falling back to a sample list if both are empty.
+  /// Ordered playlist: [initialSource] first, then the rest of [sources]
+  /// (de-duplicated). Empty when nothing valid was provided.
   List<String> _buildIds() {
     final resolved = widget.sources.map(_resolveVideoId).whereType<String>().toList();
     final initial = _resolveVideoId(widget.initialSource);
-    final ids = <String>[
-      if (initial != null) initial,
-      ...resolved.where((id) => id != initial),
-    ];
-    return ids.isEmpty ? List<String>.from(_fallbackIds) : ids;
+    return <String>[if (initial != null) initial, ...resolved.where((id) => id != initial)];
   }
 
   @override
   void initState() {
     super.initState();
     final ids = _buildIds();
-    _controller = YoutubePlayerController(
+    if (ids.isEmpty) return; // No videos → empty state; skip the player.
+    final controller = YoutubePlayerController(
       initialVideoId: ids.first,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        enableCaption: true,
-      ),
+      flags: const YoutubePlayerFlags(autoPlay: true, mute: false, enableCaption: true),
     );
-    _bloc = YouTubePlayerBloc(_controller, ids: ids);
-    _controller.addListener(_listener);
+    _controller = controller;
+    _bloc = YouTubePlayerBloc(controller, ids: ids);
+    controller.addListener(_listener);
   }
 
   void _listener() {
-    if (_bloc.state.isPlayerReady && mounted && !_controller.value.isFullScreen) {
-      _bloc.add(
+    final controller = _controller;
+    final bloc = _bloc;
+    if (controller == null || bloc == null) return;
+    if (bloc.state.isPlayerReady && mounted && !controller.value.isFullScreen) {
+      bloc.add(
         MetadataUpdated(
-          metaData: _controller.metadata,
-          playerState: _controller.value.playerState,
-          quality: _controller.value.playbackQuality,
-          playbackRate: _controller.value.playbackRate,
+          metaData: controller.metadata,
+          playerState: controller.value.playerState,
+          quality: controller.value.playbackQuality,
+          playbackRate: controller.value.playbackRate,
         ),
       );
     }
@@ -104,26 +95,32 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
   @override
   void deactivate() {
     // Pause when navigating away so audio doesn't keep playing.
-    _controller.pause();
+    _controller?.pause();
     super.deactivate();
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_listener);
-    _controller.dispose();
-    _bloc.close();
+    _controller?.removeListener(_listener);
+    _controller?.dispose();
+    _bloc?.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = _controller;
+    final bloc = _bloc;
+
+    // No videos → empty screen.
+    if (controller == null || bloc == null) return const _EmptyVideoScaffold();
+
     return BlocProvider.value(
-      value: _bloc,
+      value: bloc,
       child: YoutubePlayerBuilder(
         onExitFullScreen: () => SystemChrome.setPreferredOrientations(DeviceOrientation.values),
         player: YoutubePlayer(
-          controller: _controller,
+          controller: controller,
           showVideoProgressIndicator: true,
           progressIndicatorColor: _green,
           progressColors: const ProgressBarColors(
@@ -132,8 +129,8 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
             bufferedColor: Color(0x5526BD49),
             backgroundColor: Color(0x22000000),
           ),
-          onReady: () => _bloc.add(PlayerInitialized()),
-          onEnded: (data) => _bloc.add(VideoEnded(data.videoId)),
+          onReady: () => bloc.add(PlayerInitialized()),
+          onEnded: (data) => bloc.add(VideoEnded(data.videoId)),
         ),
         builder: (context, player) => _VideoScaffold(player: player),
       ),
@@ -144,6 +141,24 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Scaffold — green Sarbon-style app bar + light body.
 // ─────────────────────────────────────────────────────────────────────────────
+/// Green, Sarbon-style app bar shared by the player and empty screens.
+PreferredSizeWidget _videoAppBar(BuildContext context) {
+  return AppBar(
+    backgroundColor: _green,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    centerTitle: false,
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back, color: Colors.white),
+      onPressed: () => Navigator.of(context).maybePop(),
+    ),
+    title: const Text(
+      'Video qo‘llanma',
+      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
+    ),
+  );
+}
+
 class _VideoScaffold extends StatelessWidget {
   const _VideoScaffold({required this.player});
 
@@ -153,36 +168,60 @@ class _VideoScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _scaffold,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-          child: AppBar(
-            backgroundColor: _green,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            centerTitle: false,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-            title: const Text(
-              'Video qo‘llanma',
-              style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-          ),
+      appBar: _videoAppBar(context),
+      body: RefreshIndicator.adaptive(
+        onRefresh: () async {},
+        child: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
+            Container(color: Colors.black, child: player),
+            const _InfoPanel(),
+          ],
         ),
       ),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.zero,
-        children: [
-          Container(
-            color: Colors.black,
-            child: player,
+    );
+  }
+}
+
+/// Shown when the screen is opened without any videos.
+class _EmptyVideoScaffold extends StatelessWidget {
+  const _EmptyVideoScaffold();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _scaffold,
+      appBar: _videoAppBar(context),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: _green.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.video_library_outlined, color: _green, size: 44),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Hozircha video yo‘q',
+                style: TextStyle(color: _textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Video qo‘llanmalar tez orada qo‘shiladi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _textSecondary, fontSize: 14, height: 1.4),
+              ),
+            ],
           ),
-          const _InfoPanel(),
-        ],
+        ),
       ),
     );
   }
@@ -207,12 +246,7 @@ class _InfoPanel extends StatelessWidget {
               // Title.
               Text(
                 state.metaData.title.isEmpty ? 'Yuklanmoqda…' : state.metaData.title,
-                style: const TextStyle(
-                  color: _textPrimary,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
+                style: const TextStyle(color: _textPrimary, fontSize: 19, fontWeight: FontWeight.w700, height: 1.3),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -253,16 +287,14 @@ class _InfoPanel extends StatelessWidget {
 
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.playing});
+
   final bool playing;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: _green.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: _green.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -283,6 +315,7 @@ class _StatusChip extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _ControlsCard extends StatelessWidget {
   const _ControlsCard({required this.state, required this.bloc});
+
   final YouTubePlayerState state;
   final YouTubePlayerBloc bloc;
 
@@ -325,11 +358,7 @@ class _ControlsCard extends StatelessWidget {
               ),
             ),
           ),
-          _IconBtn(
-            icon: Icons.fullscreen_rounded,
-            enabled: ready,
-            onTap: () => bloc.controller.toggleFullScreenMode(),
-          ),
+          _IconBtn(icon: Icons.fullscreen_rounded, enabled: ready, onTap: () => bloc.controller.toggleFullScreenMode()),
           _IconBtn(icon: Icons.skip_next_rounded, enabled: ready, onTap: () => bloc.add(NextVideo())),
         ],
       ),
@@ -339,6 +368,7 @@ class _ControlsCard extends StatelessWidget {
 
 class _IconBtn extends StatelessWidget {
   const _IconBtn({required this.icon, required this.enabled, required this.onTap});
+
   final IconData icon;
   final bool enabled;
   final VoidCallback onTap;
@@ -365,6 +395,7 @@ class _IconBtn extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _VolumeBar extends StatelessWidget {
   const _VolumeBar({required this.state, required this.bloc});
+
   final YouTubePlayerState state;
   final YouTubePlayerBloc bloc;
 
@@ -409,6 +440,7 @@ class _VolumeBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _UpNextList extends StatelessWidget {
   const _UpNextList({required this.state, required this.bloc});
+
   final YouTubePlayerState state;
   final YouTubePlayerBloc bloc;
 
